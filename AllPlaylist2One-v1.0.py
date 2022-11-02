@@ -1,7 +1,7 @@
 import spotipy
 import os
-import subprocess
 import smtplib
+import pickle
 
 from spotipy.oauth2 import SpotifyClientCredentials
 from spotipy.oauth2 import SpotifyOAuth
@@ -11,18 +11,27 @@ from datetime import datetime
 
 scope = 'playlist-modify-public'
 
-f = open("./resSincroSpotify.txt", "w")
-f.write("")
-f.close()
-
 #Variables del entorno que recogen las claves publico/privadas de la API de Spotify
 os.environ["SPOTIPY_CLIENT_ID"] = "xxxxxxxxxx"
-os.environ["SPOTIPY_CLIENT_SECRET"] = "xxxxxxxxxxx"
+os.environ["SPOTIPY_CLIENT_SECRET"] = "xxxxxxxx"
 os.environ["SPOTIPY_REDIRECT_URI"] = "http://localhost:8080"
 
 #Interfaces de Spotipy
-gestor1 = spotipy.Spotify(client_credentials_manager=SpotifyClientCredentials())
-gestor2 = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope))
+try:
+    with open("./gestor1.pkl",'rb') as file:
+        gestor1 = pickle.load(file)
+except:
+    gestor1 = spotipy.Spotify(client_credentials_manager=SpotifyClientCredentials())
+    with open('./gestor1.pkl', 'wb') as file:
+        pickle.dump(gestor1, file)
+
+try:
+    with open("./gestor2.pkl", 'rb') as file:
+        gestor2 = pickle.load(file)
+except:
+    gestor2 = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope))
+    with open('./gestor2.pkl','wb') as file:
+        pickle.dump(gestor2,file)
 
 #Playlist a unir
 fav1URI = "spotify:playlist:4JuNe7niLd3TTfGyDS4qJA"
@@ -32,22 +41,8 @@ fav4URI = "spotify:playlist:268m9hPmNcFflE7EesoWTH"
 fav5URI = "spotify:playlist:6y9mSr78gkaqWHpxhyaVvT"
 fav6URI = "spotify:playlist:3IbjEaz8lV0OBSCdhU1PtX"
 fav7URI = "spotify:playlist:66iy1muuNIXNU0I7z0MID7"
-fav8URI = "spotify:playlist:1nxaViyX0nQtBcMdNewX6N"
-fav9URI = "spotify:playlist:0iqIDVEC7jSjqhYkkCIVHz"
-fav10URI = "spotify:playlist:4XSL9vRuWjo594HPv2LoE4"
 
-playlists = []
-
-playlists.append(fav1URI)
-playlists.append(fav2URI)
-playlists.append(fav3URI)
-playlists.append(fav4URI)
-playlists.append(fav5URI)
-playlists.append(fav6URI)
-playlists.append(fav7URI)
-playlists.append(fav8URI)
-#playlists.append(fav9URI)
-#playlists.append(fav10URI)
+playlists = [fav1URI, fav2URI, fav3URI, fav4URI, fav5URI, fav6URI, fav7URI]
 
 #Playlist donde se unen
 todoURI = "spotify:playlist:31m0z9XdTmamdjBunmhDif"
@@ -121,8 +116,7 @@ def borrarCanciones(canciones,playlistTodo):
         for x in range(0, vueltas):
             gestor2.playlist_remove_all_occurrences_of_items(playlistTodo, canciones[offset:offset + 100])
             offset += 100
-
-    gestor2.playlist_remove_all_occurrences_of_items(playlistTodo, canciones[offset:len(canciones):1])
+        gestor2.playlist_remove_all_occurrences_of_items(playlistTodo, canciones[offset:len(canciones):1])
 
     guardarTexto(f"Borrado\n")
 
@@ -193,6 +187,7 @@ def sendEmail():
     msg = MIMEMultipart()
     msg['Subject'] = "Resultado Sincronización Spotify " + datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
 
+
     archivo = open("./resSincroSpotify.txt")
     msg.attach(MIMEText(archivo.read(), 'plain'))
 
@@ -200,15 +195,23 @@ def sendEmail():
     server.starttls()
     server.login("email", "password")
 
-    server.sendmail("remitente", "destinatario", msg.as_string())
+    server.sendmail("originEmail", "destEmail", msg.as_string())
 
     server.quit()
 
-print("Sincronizando playlists de Spotify...")
+def inicializarTexto():
+    f = open("./resSincroSpotify.txt", "w")
+    f.write("")
+    f.close()
 
+print("Sincronizando playlists de Spotify...")
+inicializarTexto()
 text = "Hora de inicio: " + datetime.now().strftime("%m/%d/%Y, %H:%M:%S") + "\n"
 guardarTexto(text)
 sincronizar(playlists,todoURI)
+print("Sincronizado!")
 text = "Hora de fin: " + datetime.now().strftime("%m/%d/%Y, %H:%M:%S") + "\n"
 guardarTexto(text)
+print("Enviando email...")
 sendEmail()
+print("Terminado!")
